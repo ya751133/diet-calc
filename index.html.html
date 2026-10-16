@@ -120,4 +120,368 @@
   .food-meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 3px; }
   .food-control { display: flex; align-items: center; gap: 8px; }
   .food-control input[type="number"] { width: 75px; text-align: right; }
-  .food-control input[type="range"] { width: 90
+  .food-control input[type="range"] { width: 90px; cursor: pointer; }
+  input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 左側：目標設定與即時儀表板 -->
+  <div class="sidebar">
+    <div class="card">
+      <h2>每日目標與達成率</h2>
+      
+      <div class="macro-progress">
+        <div class="macro-header">
+          <span>總熱量 (kcal)</span>
+          <span id="label-cal">0 / 2000</span>
+        </div>
+        <div class="bar-container"><div class="bar bar-cal" id="bar-cal"></div></div>
+      </div>
+
+      <div class="macro-progress">
+        <div class="macro-header">
+          <span>碳水化合物 (g)</span>
+          <span id="label-carb">0 / 200</span>
+        </div>
+        <div class="bar-container"><div class="bar bar-c" id="bar-carb"></div></div>
+      </div>
+
+      <div class="macro-progress">
+        <div class="macro-header">
+          <span>蛋白質 (g)</span>
+          <span id="label-protein">0 / 150</span>
+        </div>
+        <div class="bar-container"><div class="bar bar-p" id="bar-protein"></div></div>
+      </div>
+
+      <div class="macro-progress">
+        <div class="macro-header">
+          <span>脂肪 (g)</span>
+          <span id="label-fat">0 / 50</span>
+        </div>
+        <div class="bar-container"><div class="bar bar-f" id="bar-fat"></div></div>
+      </div>
+
+      <hr style="margin: 16px 0; border: none; border-top: 1px solid var(--border);">
+
+      <h2>目標設定</h2>
+      <div class="form-group">
+        <label>目標熱量 (kcal)</label>
+        <input type="number" id="target-cal" value="2000" min="0">
+      </div>
+      <div class="grid-3">
+        <div class="form-group">
+          <label>碳水 (g)</label>
+          <input type="number" id="target-carb" value="200" min="0">
+        </div>
+        <div class="form-group">
+          <label>蛋白質 (g)</label>
+          <input type="number" id="target-protein" value="150" min="0">
+        </div>
+        <div class="form-group">
+          <label>脂肪 (g)</label>
+          <input type="number" id="target-fat" value="50" min="0">
+        </div>
+      </div>
+
+      <button type="button" class="btn" id="btn-auto">依勾選食材自動試算配比</button>
+      <button type="button" class="btn btn-outline" id="btn-reset">清空所選份量</button>
+    </div>
+  </div>
+
+  <!-- 右側：食材庫與微調 -->
+  <div class="main-content">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h2>食材清單與即時調整</h2>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">單位：克 (g) 或 份/顆/包</span>
+      </div>
+
+      <div class="category-nav" id="category-nav">
+        <div class="badge-filter active" data-cat="all">全部</div>
+        <div class="badge-filter" data-cat="蛋白質/肉品海鮮">好市多肉品/海鮮</div>
+        <div class="badge-filter" data-cat="康福先生雞胸">康福先生雞胸肉</div>
+        <div class="badge-filter" data-cat="碳水/水果">碳水與水果</div>
+        <div class="badge-filter" data-cat="蔬菜類">水煮青菜</div>
+        <div class="badge-filter" data-cat="優格/蛋/堅果">優格/蛋/堅果</div>
+      </div>
+
+      <div class="food-list" id="food-list-container"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const foodDatabase = [
+  // 好市多肉品海鮮
+  { id: "c1", cat: "蛋白質/肉品海鮮", name: "好市多 帶尾超大生蝦 (Kirkland)", unit: "g", step: 10, max: 600, cal: 85, c: 0.5, p: 18.5, f: 0.8 },
+  { id: "c2", cat: "蛋白質/肉品海鮮", name: "好市多 紅龍牛肉漢堡排", unit: "片(110g)", step: 1, max: 6, cal: 265, c: 2.5, p: 17.5, f: 21.0 },
+  { id: "c3", cat: "蛋白質/肉品海鮮", name: "好市多 冷凍豬里肌肉", unit: "g", step: 10, max: 600, cal: 125, c: 0.0, p: 22.5, f: 3.5 },
+  { id: "c4", cat: "蛋白質/肉品海鮮", name: "好市多 冷凍豬梅花肉", unit: "g", step: 10, max: 600, cal: 210, c: 0.0, p: 18.0, f: 15.0 },
+  { id: "c5", cat: "蛋白質/肉品海鮮", name: "好市多 生鮮清雞胸肉", unit: "g", step: 10, max: 600, cal: 110, c: 0.0, p: 23.5, f: 1.5 },
+  { id: "c6", cat: "蛋白質/肉品海鮮", name: "好市多 冷凍鯛魚背肉排 (優選)", unit: "g", step: 10, max: 600, cal: 96, c: 0.0, p: 20.0, f: 1.5 },
+  { id: "c7", cat: "蛋白質/肉品海鮮", name: "好市多 冷凍大西洋鮭魚排 (優選)", unit: "g", step: 10, max: 500, cal: 215, c: 0.0, p: 20.5, f: 14.5 },
+
+  // 康福先生 160g
+  { id: "kf1", cat: "康福先生雞胸", name: "康福先生 香檸百草椒鹽 (160g)", unit: "包(160g)", step: 1, max: 5, cal: 185, c: 1.2, p: 38.0, f: 2.8 },
+  { id: "kf2", cat: "康福先生雞胸", name: "康福先生 香料老墨 (160g)", unit: "包(160g)", step: 1, max: 5, cal: 190, c: 2.0, p: 38.0, f: 3.2 },
+  { id: "kf3", cat: "康福先生雞胸", name: "康福先生 香拌油蔥 (160g)", unit: "包(160g)", step: 1, max: 5, cal: 215, c: 1.5, p: 37.5, f: 6.8 },
+  { id: "kf4", cat: "康福先生雞胸", name: "康福先生 德州BBQ (160g)", unit: "包(160g)", step: 1, max: 5, cal: 205, c: 4.8, p: 37.0, f: 3.5 },
+  { id: "kf5", cat: "康福先生雞胸", name: "康福先生 王牌青醬 (160g)", unit: "包(160g)", step: 1, max: 5, cal: 230, c: 2.2, p: 37.0, f: 8.0 },
+  { id: "kf6", cat: "康福先生雞胸", name: "康福先生 正宗川椒 (160g)", unit: "包(160g)", step: 1, max: 5, cal: 195, c: 1.8, p: 38.0, f: 3.8 },
+
+  // 碳水與水果
+  { id: "carb1", cat: "碳水/水果", name: "Weet-Bix 麥香高纖麥片", unit: "塊(約15g)", step: 1, max: 12, cal: 53, c: 10.0, p: 1.8, f: 0.2 },
+  { id: "carb2", cat: "碳水/水果", name: "好市多 冷凍藍莓", unit: "g", step: 10, max: 400, cal: 57, c: 14.5, p: 0.7, f: 0.3 },
+  { id: "carb3", cat: "碳水/水果", name: "好市多 冷凍草莓", unit: "g", step: 10, max: 400, cal: 32, c: 7.7, p: 0.7, f: 0.3 },
+  { id: "carb4", cat: "碳水/水果", name: "好市多 冰烤地瓜 (優選)", unit: "g", step: 10, max: 500, cal: 130, c: 30.0, p: 1.5, f: 0.2 },
+
+  // 優格、蛋、堅果
+  { id: "misc1", cat: "優格/蛋/堅果", name: "自製優格 (義美無乳糖鮮乳+光泉頂級優格發酵)", unit: "g", step: 10, max: 500, cal: 63, c: 4.8, p: 3.3, f: 3.5 },
+  { id: "misc2", cat: "優格/蛋/堅果", name: "好市多 無調味綜合堅果 (柯克蘭)", unit: "g", step: 5, max: 100, cal: 610, c: 19.0, p: 18.0, f: 54.0 },
+  { id: "misc3", cat: "優格/蛋/堅果", name: "水煮蛋", unit: "顆", step: 1, max: 8, cal: 74, c: 0.6, p: 6.3, f: 5.0 },
+  { id: "misc4", cat: "優格/蛋/堅果", name: "煎蛋 (含噴霧油)", unit: "顆", step: 1, max: 8, cal: 95, c: 0.6, p: 6.3, f: 7.5 },
+  { id: "misc5", cat: "優格/蛋/堅果", name: "好市多 中華有機嫩豆腐 (優選)", unit: "盒(300g)", step: 0.5, max: 3, cal: 155, c: 3.0, p: 15.0, f: 9.0 },
+
+  // 水煮蔬菜類
+  { id: "veg1", cat: "蔬菜類", name: "好市多 冷凍青花菜", unit: "g", step: 10, max: 500, cal: 34, c: 6.6, p: 2.8, f: 0.4 },
+  { id: "veg2", cat: "蔬菜類", name: "水煮地瓜葉", unit: "g", step: 10, max: 500, cal: 28, c: 4.4, p: 3.2, f: 0.3 },
+  { id: "veg3", cat: "蔬菜類", name: "水煮小白菜", unit: "g", step: 10, max: 500, cal: 13, c: 2.2, p: 1.5, f: 0.2 },
+  { id: "veg4", cat: "蔬菜類", name: "水煮高麗菜", unit: "g", step: 10, max: 500, cal: 25, c: 5.8, p: 1.3, f: 0.1 },
+  { id: "veg5", cat: "蔬菜類", name: "水煮娃娃菜", unit: "g", step: 10, max: 500, cal: 16, c: 3.0, p: 1.6, f: 0.1 },
+  { id: "veg6", cat: "蔬菜類", name: "水煮大陸妹 (福山萵苣)", unit: "g", step: 10, max: 500, cal: 14, c: 2.5, p: 1.2, f: 0.2 },
+  { id: "veg7", cat: "蔬菜類", name: "水煮包心大白菜", unit: "g", step: 10, max: 500, cal: 17, c: 3.3, p: 1.2, f: 0.1 }
+];
+
+// 儲存目前每項食材的份量
+const state = {};
+foodDatabase.forEach(item => { state[item.id] = 0; });
+
+// 一次性渲染所有食材 DOM，切換分類時僅用 style.display 控制，避免事件遺失
+function initFoodList() {
+  const container = document.getElementById("food-list-container");
+  container.innerHTML = "";
+
+  foodDatabase.forEach(item => {
+    const row = document.createElement("div");
+    row.className = "food-row";
+    row.id = `row-${item.id}`;
+    row.setAttribute("data-cat", item.cat);
+
+    const baseNote = item.unit === "g" ? "每 100g" : "每 1 " + item.unit;
+    row.innerHTML = `
+      <input type="checkbox" data-id="${item.id}" class="item-chk">
+      <div>
+        <div class="food-title">${item.name}</div>
+        <div class="food-meta">${baseNote}：${item.cal} kcal | 碳水 ${item.c}g | 蛋白 ${item.p}g | 脂肪 ${item.f}g</div>
+      </div>
+      <div class="food-control">
+        <input type="range" min="0" max="${item.max}" step="${item.step}" value="0" data-id="${item.id}" class="item-range">
+        <input type="number" min="0" max="${item.max}" step="${item.step}" value="0" data-id="${item.id}" class="item-num">
+        <span style="font-size:0.8rem; color:var(--text-muted); width: 38px;">${item.unit}</span>
+      </div>
+    `;
+    container.appendChild(row);
+  });
+}
+
+// 核心更新份量邏輯
+function setQty(id, val) {
+  val = Math.max(0, parseFloat(val) || 0);
+  state[id] = val;
+
+  const row = document.getElementById(`row-${id}`);
+  if (!row) return;
+
+  const chk = row.querySelector(".item-chk");
+  const num = row.querySelector(".item-num");
+  const range = row.querySelector(".item-range");
+
+  if (num && parseFloat(num.value) !== val) num.value = val;
+  if (range && parseFloat(range.value) !== val) range.value = val;
+  if (chk) chk.checked = val > 0;
+
+  if (val > 0) {
+    row.classList.add("selected");
+  } else {
+    row.classList.remove("selected");
+  }
+
+  calcTotals();
+}
+
+// 全域計算與更新儀表板
+function calcTotals() {
+  let totalCal = 0, totalC = 0, totalP = 0, totalF = 0;
+
+  foodDatabase.forEach(item => {
+    const qty = state[item.id] || 0;
+    if (qty > 0) {
+      const factor = item.unit === "g" ? (qty / 100) : qty;
+      totalCal += item.cal * factor;
+      totalC += item.c * factor;
+      totalP += item.p * factor;
+      totalF += item.f * factor;
+    }
+  });
+
+  const targetCal = Math.max(1, parseFloat(document.getElementById("target-cal").value) || 2000);
+  const targetC = Math.max(1, parseFloat(document.getElementById("target-carb").value) || 200);
+  const targetP = Math.max(1, parseFloat(document.getElementById("target-protein").value) || 150);
+  const targetF = Math.max(1, parseFloat(document.getElementById("target-fat").value) || 50);
+
+  document.getElementById("label-cal").innerText = `${Math.round(totalCal)} / ${targetCal}`;
+  document.getElementById("label-carb").innerText = `${totalC.toFixed(1)} / ${targetC}`;
+  document.getElementById("label-protein").innerText = `${totalP.toFixed(1)} / ${targetP}`;
+  document.getElementById("label-fat").innerText = `${totalF.toFixed(1)} / ${targetF}`;
+
+  setBarWidth("bar-cal", totalCal, targetCal);
+  setBarWidth("bar-carb", totalC, targetC);
+  setBarWidth("bar-protein", totalP, targetP);
+  setBarWidth("bar-fat", totalF, targetF);
+}
+
+function setBarWidth(id, val, target) {
+  const pct = Math.min(100, Math.round((val / target) * 100));
+  const el = document.getElementById(id);
+  el.style.width = pct + "%";
+  if (val > target * 1.05) {
+    el.style.backgroundColor = "#ef4444";
+  } else {
+    el.style.backgroundColor = "";
+  }
+}
+
+// 事件綁定 (委派模式，確保 100% 響應)
+function bindEvents() {
+  const container = document.getElementById("food-list-container");
+
+  // 1. 食材列表即時響應 (點勾選框、拉滑桿、改數字)
+  container.addEventListener("input", (e) => {
+    const id = e.target.getAttribute("data-id");
+    if (!id) return;
+    if (e.target.classList.contains("item-num") || e.target.classList.contains("item-range")) {
+      setQty(id, e.target.value);
+    }
+  });
+
+  container.addEventListener("change", (e) => {
+    const id = e.target.getAttribute("data-id");
+    if (!id) return;
+    if (e.target.classList.contains("item-chk")) {
+      const item = foodDatabase.find(x => x.id === id);
+      if (e.target.checked) {
+        // 勾選預設值
+        const defaultQty = item.unit === "g" ? 100 : 1;
+        setQty(id, defaultQty);
+      } else {
+        setQty(id, 0);
+      }
+    }
+  });
+
+  // 2. 左側目標設定即時響應 (包括 input 與 change)
+  ["target-cal", "target-carb", "target-protein", "target-fat"].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener("input", calcTotals);
+    el.addEventListener("change", calcTotals);
+  });
+
+  // 3. 分類篩選按鈕
+  document.getElementById("category-nav").addEventListener("click", (e) => {
+    const btn = e.target.closest(".badge-filter");
+    if (!btn) return;
+    document.querySelectorAll(".badge-filter").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+
+    const cat = btn.getAttribute("data-cat");
+    document.querySelectorAll(".food-row").forEach(row => {
+      if (cat === "all" || row.getAttribute("data-cat") === cat) {
+        row.style.display = "grid";
+      } else {
+        row.style.display = "none";
+      }
+    });
+  });
+
+  // 4. 自動試算配比按鈕
+  document.getElementById("btn-auto").addEventListener("click", autoOptimize);
+
+  // 5. 清空按鈕
+  document.getElementById("btn-reset").addEventListener("click", () => {
+    foodDatabase.forEach(item => setQty(item.id, 0));
+  });
+}
+
+// 自動分配算法
+function autoOptimize() {
+  const checkedItems = foodDatabase.filter(item => {
+    const row = document.getElementById(`row-${item.id}`);
+    const chk = row.querySelector(".item-chk");
+    return chk && chk.checked;
+  });
+
+  if (checkedItems.length === 0) {
+    alert("請先打勾勾選至少 1 ~ 3 種食材，系統才能為你精準分配份量！");
+    return;
+  }
+
+  const targetP = parseFloat(document.getElementById("target-protein").value) || 150;
+  const targetC = parseFloat(document.getElementById("target-carb").value) || 200;
+
+  // 區分主蛋白質來源與主碳水來源
+  let pSources = checkedItems.filter(x => x.p * 4 > x.c * 4 && x.p * 4 > x.f * 9);
+  let cSources = checkedItems.filter(x => x.c * 4 >= x.p * 4);
+
+  if (pSources.length === 0) pSources = checkedItems;
+  if (cSources.length === 0) cSources = checkedItems;
+
+  const plan = {};
+
+  // 蛋白質分配
+  const pPerItem = targetP / pSources.length;
+  pSources.forEach(item => {
+    const ratio = item.unit === "g" ? item.p / 100 : item.p;
+    let qty = ratio > 0 ? Math.round(pPerItem / ratio) : 0;
+    if (item.unit === "g") qty = Math.round(qty / item.step) * item.step;
+    qty = Math.min(item.max, Math.max(item.step, qty));
+    plan[item.id] = (plan[item.id] || 0) + qty;
+  });
+
+  // 碳水分配
+  let curC = 0;
+  checkedItems.forEach(item => {
+    const q = plan[item.id] || 0;
+    const factor = item.unit === "g" ? q / 100 : q;
+    curC += item.c * factor;
+  });
+
+  const remainC = Math.max(0, targetC - curC);
+  const cPerItem = remainC / cSources.length;
+  cSources.forEach(item => {
+    const ratio = item.unit === "g" ? item.c / 100 : item.c;
+    if (ratio > 0) {
+      let qty = Math.round(cPerItem / ratio);
+      if (item.unit === "g") qty = Math.round(qty / item.step) * item.step;
+      qty = Math.min(item.max, Math.max(0, qty));
+      plan[item.id] = (plan[item.id] || 0) + qty;
+    }
+  });
+
+  // 更新至畫面
+  checkedItems.forEach(item => {
+    let finalQty = plan[item.id] || (item.unit === "g" ? 100 : 1);
+    finalQty = Math.min(item.max, Math.max(item.step, finalQty));
+    setQty(item.id, finalQty);
+  });
+}
+
+// 初始化
+initFoodList();
+bindEvents();
+calcTotals();
+</script>
+</body>
+</html>
