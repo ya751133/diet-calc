@@ -106,6 +106,31 @@
     font-weight: 600;
   }
 
+
+  /* Carb Cycle Presets */
+  .carb-cycle-btn {
+    flex: 1;
+    min-width: 80px;
+    padding: 6px 8px;
+    background: #f1f5f9;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s ease;
+  }
+  .carb-cycle-btn:hover {
+    background: #e2e8f0;
+  }
+  .carb-cycle-btn.active {
+    background: #e0f2fe;
+    color: #0284c7;
+    border-color: #38bdf8;
+  }
+
   /* Nav Filter */
   .category-nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
   .badge-filter {
@@ -281,7 +306,17 @@
         <input type="number" id="target-cal" value="2000" min="500" step="50">
       </div>
 
-      <label>三大營養素比例 (%)</label>
+      <div class="form-group" style="margin-bottom: 10px;">
+        <label>碳循環飲食模式：</label>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-bottom: 8px;">
+          <button type="button" class="carb-cycle-btn" id="cycle-high" onclick="setCarbCycle('high')">🔥 高碳日 (50/30/20)</button>
+          <button type="button" class="carb-cycle-btn" id="cycle-low" onclick="setCarbCycle('low')">⚡ 低碳日 (25/40/35)</button>
+          <button type="button" class="carb-cycle-btn" id="cycle-zero" onclick="setCarbCycle('zero')">🛡️ 無/極低碳日 (5/50/45)</button>
+          <button type="button" class="carb-cycle-btn" id="cycle-custom" onclick="setCarbCycle('custom')">✏️ 自訂比例</button>
+        </div>
+      </div>
+
+      <label>三大營養素比例 (%) - 亦可直接手動輸入</label>
       <div class="grid-3">
         <div class="form-group">
           <label style="color:var(--carb); font-weight:600;">碳水 %</label>
@@ -528,6 +563,45 @@ function initFoodList() {
   });
 }
 
+
+// 碳循環預設模板邏輯
+const carbCyclePresets = {
+  high: { c: 50, p: 30, f: 20 },
+  low: { c: 25, p: 40, f: 35 },
+  zero: { c: 5, p: 50, f: 45 }
+};
+
+function setCarbCycle(mode) {
+  document.querySelectorAll(".carb-cycle-btn").forEach(b => b.classList.remove("active"));
+  const btn = document.getElementById(`cycle-${mode}`);
+  if (btn) btn.classList.add("active");
+
+  if (mode !== "custom" && carbCyclePresets[mode]) {
+    const preset = carbCyclePresets[mode];
+    document.getElementById("ratio-c").value = preset.c;
+    document.getElementById("ratio-p").value = preset.p;
+    document.getElementById("ratio-f").value = preset.f;
+    updateTargetsFromRatio();
+  }
+}
+
+function checkCarbCycleMatch() {
+  const c = parseFloat(document.getElementById("ratio-c").value) || 0;
+  const p = parseFloat(document.getElementById("ratio-p").value) || 0;
+  const f = parseFloat(document.getElementById("ratio-f").value) || 0;
+
+  document.querySelectorAll(".carb-cycle-btn").forEach(b => b.classList.remove("active"));
+  if (c === 50 && p === 30 && f === 20) {
+    document.getElementById("cycle-high").classList.add("active");
+  } else if (c === 25 && p === 40 && f === 35) {
+    document.getElementById("cycle-low").classList.add("active");
+  } else if (c === 5 && p === 50 && f === 45) {
+    document.getElementById("cycle-zero").classList.add("active");
+  } else {
+    document.getElementById("cycle-custom").classList.add("active");
+  }
+}
+
 function updateTargetsFromRatio() {
   const cal = Math.max(1, parseFloat(document.getElementById("target-cal").value) || 2000);
   const rc = parseFloat(document.getElementById("ratio-c").value) || 0;
@@ -555,6 +629,7 @@ function updateTargetsFromRatio() {
   document.getElementById("calc-target-p").innerText = pGrams + "g";
   document.getElementById("calc-target-f").innerText = fGrams + "g";
 
+  checkCarbCycleMatch();
   computedTarget = {
     cal: cal,
     c: parseFloat(cGrams) || 1,
